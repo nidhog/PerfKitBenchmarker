@@ -126,10 +126,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if self.spec.high_availability:
       ha_flag = '--failover-replica-name=replica-' + self.instance_id
       cmd_string.append(ha_flag)
-    if FLAGS.enable_database_backup:
-      cmd_string.append('--backup')
-      cmd_string.append('--backup-start-time={}'.format(
-          FLAGS.database_backup_time_utc))
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
 
@@ -231,14 +227,15 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     stdout, _, _ = cmd.Issue()
     try:
       json_output = json.loads(stdout)
-      json_output['state'] == 'RUNNABLE')
+      is_ready = json_output['state'] == 'RUNNABLE'
     except:
       logging.exception('Error attempting to read stdout. Creation failure.')
-      is_ready = False
+      return False
     if is_ready:
       self.endpoint = self._ParseEndpoint(json_output)
       self.port = self.MYSQL_DEFAULT_PORT
-    return is_ready
+      return True
+    return False
 
   def _ParseEndpoint(self, describe_instance_json):
     """Return the URI of the resource given the metadata as JSON.
@@ -249,7 +246,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       resource URI (string)
     """
     try:
-      selflink = describe_instance_json[0]['selfLink']
+      selflink = describe_instance_json['selfLink']
     except:
       selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')

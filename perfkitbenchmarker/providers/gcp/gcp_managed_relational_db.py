@@ -114,15 +114,17 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size
     ]
+    # TODO(ferneyhough): tier machine types are supported on Posgres too
     if self.spec.database == managed_relational_db.MYSQL:
       machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
+      cmd_string.append(machine_type_flag)
     else:
       self._ValidateSpec()
       memory = self.spec.vm_spec.memory
       cpus = self.spec.vm_spec.cpus
       self._ValidateMachineType(memory, cpus)
-      machine_type_flag = ('--cpu={} --ram={}'.format(cpus, memory))
-    cmd_string.append(machine_type_flag)
+      cmd_string.append('--cpu={}'.format(cpus))
+      cmd_string.append('--memory={}MiB'.format(memory))
     if self.spec.high_availability:
       ha_flag = '--failover-replica-name=replica-' + self.instance_id
       cmd_string.append(ha_flag)
@@ -228,9 +230,13 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
+    try:
+      cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
-    stdout, _, _ = cmd.Issue()
+      stdout, _, _ = cmd.Issue()
+    except Exception as e:
+      print e
+      return False
     try:
       json_output = json.loads(stdout)
       if not json_output['state'] == 'RUNNABLE':
@@ -243,15 +249,15 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return True
 
   def _ParseEndpoint(self, describe_instance_json):
-    """Return the URI of the resource given the metadata as JSON.
+    """Return the IP of the resource given the metadata as JSON.
 
     Args:
       describe_instance_json: JSON output.
     Returns:
-      resource URI (string)
+      public IP address (string)
     """
     try:
-      selflink = describe_instance_json['selfLink']
+      selflink = describe_instance_json['ipAddresses'][0]['ipAddress']
     except:
       selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')
@@ -264,7 +270,13 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     once, after the resource is confirmed to exist. It is intended to allow
     data about the resource to be collected or for the resource to be tagged.
     """
-    pass
+    # TODO(ferneyhough): raise exception on failure
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'create', self.GetUsername(), 'dummy_host',
+        '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.GetPassword()))
+    stdout, _, _ = cmd.Issue()
+    print(stdout)
 
   def _CreateDependencies(self):
     """Method that will be called once before _CreateResource() is called.

@@ -61,22 +61,26 @@ pgbench:
     vm_spec:
       GCP:
         machine_type:
-          cpus: 1
-          memory: 3840MiB
+          cpus: 16
+          memory: 54GiB
         zone: us-central1-c
       AWS:
         machine_type: db.t1.micro
         zone: us-west-2a
     disk_spec:
       GCP:
-        disk_size: 50
+        disk_size: 1000
         disk_type: pd-ssd
       AWS:
         disk_size: 5
         disk_type: gp2
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-16
+          image: ubuntu-1604-xenial-v20170815a
+          image_project: ubuntu-os-cloud
       disk_spec: *default_50_gb
 """
 
@@ -99,10 +103,26 @@ def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
   vm.Install('pgbench')
 
+  test_db_name = 'perftest'
+  default_db_name = 'postgres'
+  db = benchmark_spec.managed_relational_db
+  endpoint = db.GetEndpoint()
+  username = db.GetUsername()
+  password = db.GetPassword()
+  connection_string = MakePsqlConnectionString(
+      endpoint, username, password, default_db_name)
 
-def MakePsqlConnectionString(endpoint, user, password, default_database):
+  CreateDatabase(benchmark_spec, username, password,
+                 default_db_name, endpoint, test_db_name)
+
+  scale_factor = 4000
+  stdout, _ = vm.RemoteCommand('pgbench -i -s {0} {1} {2}'.format(
+      scale_factor, connection_string, db_name))
+
+
+def MakePsqlConnectionString(endpoint, user, password, database):
   return '\'host={0} user={1} password={2} dbname={3}\''.format(
-      endpoint, user, password, default_database)
+      endpoint, user, password, database)
 
 
 def CreateDatabase(benchmark_spec, user, password, default_database,
@@ -113,30 +133,20 @@ def CreateDatabase(benchmark_spec, user, password, default_database,
                                                         new_database)
   stdout, _ = benchmark_spec.vms[0].RemoteCommand(command, should_log=True)
 
+
 def Run(benchmark_spec):
-  vm = benchmark_spec.vms[0]
+  test_db_name = 'perftest'
   db = benchmark_spec.managed_relational_db
-  db_endpoint = db.GetEndpoint()
-  db_port = db.GetPort()
-  db_username = db.GetUsername()
-  db_password = db.GetPassword()
-  print db_endpoint
-  print db_port
-  print db.GetUsername()
-  print db.GetPassword()
-
-  db_name = 'perftest'
-  CreateDatabase(benchmark_spec, db_username, db_password,
-                 'postgres', db_endpoint, db_name)
-  scale_factor = 4000
-  connection_string = MakePsqlConnectionString(db_endpoint, db_username,
-                                               db_password, db_name)
-  stdout, _ = vm.RemoteCommand(
-      'pgbench -i -s {0} {1} {2}'.format(
-        scale_factor, connection_string, db_name))
-  print stdout
+  endpoint = db.GetEndpoint()
+  username = db.GetUsername()
+  password = db.GetPassword()
+  connection_string = MakePsqlConnectionString(
+      endpoint, username, password, test_db_name)
 
 
+  command = ('pgbench {0} -c 16 -j 16 -T 30 -P 1 '
+             '-r {1}'.format(connection_string, test_db_name))
+  benchmark_spec.vms[0].RemoteCommand(command, should_log=True)
   return []
 
 

@@ -55,7 +55,6 @@ pgbench:
           machine_type: n1-standard-16
           image: ubuntu-1604-xenial-v20170815a
           image_project: ubuntu-os-cloud
-      disk_spec: *default_50_gb
 """
 
 

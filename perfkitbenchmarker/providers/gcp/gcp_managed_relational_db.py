@@ -33,8 +33,10 @@ If not, run
 to install it. This will allow this benchmark to properly create an instance.
 """
 
+import datetime
 import json
 import logging
+import time
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -230,20 +232,27 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    try:
-      cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
+    timeout = 600 # 10 minutes
+    cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
-      stdout, _, _ = cmd.Issue()
-    except Exception as e:
-      print e
-      return False
-    try:
-      json_output = json.loads(stdout)
-      if not json_output['state'] == 'RUNNABLE':
+    start_time = datetime.datetime.now()
+
+    while True:
+      if (datetime.datetime.now() - start_time).seconds > timeout:
+        loggine.exception('Timeout waiting for sql instance to be ready')
         return False
-    except:
-      logging.exception('Error attempting to read stdout. Creation failure.')
-      return False
+      time.sleep(5)
+      stdout, _, retcode = cmd.Issue(suppress_warning=True)
+
+      try:
+        json_output = json.loads(stdout)
+        state = json_output['state']
+        logging.info('Instance state: {0}'.format(state))
+        if state == 'RUNNABLE':
+          break
+      except:
+        logging.exception('Error attempting to read stdout. Creation failure.')
+        return False
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = self.MYSQL_DEFAULT_PORT
     return True

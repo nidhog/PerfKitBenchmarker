@@ -40,23 +40,32 @@ class PgbenchBenchmarkTestCase(unittest.TestCase):
     testMetadata = {'foo': 'bar'}
     num_clients = 32
     num_jobs = 16
-    expected_metadata = testMetadata.copy()
-    expected_metadata.update({'clients': num_clients, 'jobs': num_jobs})
+    expected_tps_metadata = testMetadata.copy()
+    expected_tps_metadata.update({
+        'clients': num_clients,
+        'jobs': num_jobs,
+        'tps': [7.0, 14.0, 13.0, 14.0, 13.0],
+    })
+    expected_latency_metadata = testMetadata.copy()
+    expected_latency_metadata.update({
+        'clients': num_clients,
+        'jobs': num_jobs,
+        'latency': [435.396, 1038.548, 1055.813, 1123.461, 1358.214],
+    })
 
     actual = pgbench_benchmark._MakeSamplesFromOutput(
         self.stderr_output, num_clients, num_jobs, testMetadata)
     self.assertEqual(2, len(actual))
 
-    tps_sample = [x for x in actual if x.metric == 'tps'][0]
-    self.assertEqual(tps_sample.value, [7.0, 14.0, 13.0, 14.0, 13.0])
+    tps_sample = [x for x in actual if x.metric == 'tps_array'][0]
+    self.assertEqual(tps_sample.value, -1)
     self.assertEqual(tps_sample.unit, 'tps')
-    self.assertDictEqual(tps_sample.metadata, expected_metadata)
+    self.assertDictEqual(tps_sample.metadata, expected_tps_metadata)
 
-    latency_sample = [x for x in actual if x.metric == 'latency'][0]
-    self.assertEqual(latency_sample.value,
-                     [435.396, 1038.548, 1055.813, 1123.461, 1358.214])
+    latency_sample = [x for x in actual if x.metric == 'latency_array'][0]
+    self.assertEqual(latency_sample.value, -1)
     self.assertEqual(latency_sample.unit, 'ms')
-    self.assertDictEqual(latency_sample.metadata, expected_metadata)
+    self.assertDictEqual(latency_sample.metadata, expected_latency_metadata)
 
 
 if __name__ == '__main__':

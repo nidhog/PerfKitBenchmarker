@@ -1,3 +1,4 @@
+Warning: Permanently added '35.196.57.231' (ECDSA) to the list of known hosts.
 starting vacuum...end.
 progress: 1.0 s, 7.0 tps, lat 435.396 ms stddev 120.347
 progress: 2.0 s, 14.0 tps, lat 1038.548 ms stddev 334.855

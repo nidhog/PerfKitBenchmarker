@@ -61,6 +61,7 @@ pgbench:
 
 TEST_DB_NAME = 'perftest'
 DEFAULT_DB_NAME = 'postgres'
+MAX_JOBS = 16 # TODO(ferneyhough): use test VM num_cpus
 
 
 def GetConfig(user_config):
@@ -77,11 +78,15 @@ def CheckPrerequisites(benchmark_config):
   pass
 
 
+# TODO(ferneyhough): need to figure out a way to get managed_db
+# vm_spec into metadata
 def UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec):
   benchmark_spec.scale_factor = FLAGS.pgbench_scale_factor
 
+
 def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
   benchmark_spec.seconds_per_test = FLAGS.pgbench_seconds_per_test
+
 
 def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
@@ -134,16 +139,21 @@ def CreateDatabase(benchmark_spec, user, password, default_database,
 
 def _MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
                            additional_metadata):
-  metadata = additional_metadata.copy()
-  metadata.update({'clients': num_clients, 'jobs': num_jobs})
-
-  lines = pgbench_stderr.splitlines()[1:]
+  lines = pgbench_stderr.splitlines()[2:]
   tps_numbers = [float(line.split(' ')[3]) for line in lines]
   latency_numbers = [float(line.split(' ')[6]) for line in lines]
 
-  tps_sample = sample.Sample('tps', tps_numbers, 'tps', metadata)
-  latency_sample = sample.Sample('latency', latency_numbers, 'ms', metadata)
+  metadata = additional_metadata.copy()
+  metadata.update({'clients': num_clients, 'jobs': num_jobs})
+  tps_metadata = metadata.copy()
+  tps_metadata.update({'tps': tps_numbers})
+  latency_metadata = metadata.copy()
+  latency_metadata.update({'latency': latency_numbers})
+
+  tps_sample = sample.Sample('tps_array', -1, 'tps', tps_metadata)
+  latency_sample = sample.Sample('latency_array', -1, 'ms', latency_metadata)
   return [tps_sample, latency_sample]
+
 
 def Run(benchmark_spec):
   UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec)
@@ -160,19 +170,21 @@ def Run(benchmark_spec):
       'seconds_per_test': benchmark_spec.seconds_per_test,
   }
 
-  clients = 32
-  jobs = 16
-  command = ('pgbench {0} --client={1} --jobs={2} --time={3} --progress=1 '
-             '--report-latencies'.format(
-                 connection_string,
-                 clients,
-                 jobs,
-                 benchmark_spec.seconds_per_test))
-  stdout, stderr = benchmark_spec.vms[0].RemoteCommand(command, should_log=True)
-  print 'out', stdout
-  print 'err', stderr
-  sample = _MakeSamplesFromOutput(stderr, clients, jobs, common_metadata)
-  return [sample]
+  clients = [1, 2, 4, 8, 16, 32, 64]
+  samples = []
+  for client in clients:
+    jobs = min(client, 16)
+    command = ('pgbench {0} --client={1} --jobs={2} --time={3} --progress=1 '
+               '--report-latencies'.format(
+                   connection_string,
+                   client,
+                   jobs,
+                   benchmark_spec.seconds_per_test))
+    stdout, stderr = benchmark_spec.vms[0].RemoteCommand(
+        command, should_log=True)
+    samples.extend(_MakeSamplesFromOutput(
+        stderr, client, jobs, common_metadata))
+  return samples
 
 
 def Cleanup(benchmark_spec):

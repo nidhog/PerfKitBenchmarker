@@ -11,46 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Test for managed relational database provisioning.
-
-This is a set of benchmarks that measures performance of SQL Databases on
-managed MySQL services.
-
-- On AWS, we will use RDS+MySQL and RDS PostgreSQL.
-- On GCP, we will use Cloud SQL v2 (Performance Edition).
-As other cloud providers deliver a managed SQL service, we will add it here.
-
-To run this benchmark the following flags can be used to overwrite config:
-- database: {mysql, postgres} Declares type of database.
-- database_name: Defaults to 'pkb-db-{run_uri}'.
-- database_username: Defaults to 'pkb-db-user-{run_uri}'.
-- database_password: Defaults to random 10-character alpha-numeric string.
-- database_version: {5.7, 9.6} Defaulted to latest for type.
-- high_availability: Boolean.
-- data_disk_size: integer. Storage size.
-
-
-As of June 2017 to make this benchmark run for GCP you must install the
-gcloud beta component. This is necessary because creating a Cloud SQL instance
-with a non-default storage size is in beta right now. This can be removed when
-this feature is part of the default components.
-See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
-for more information.
-To run this benchmark for GCP it is required to install a non-default gcloud
-component. Otherwise this benchmark will fail.
-To ensure that gcloud beta is installed, type
-        'gcloud components list'
-into the terminal. This will output all components and status of each.
-Make sure that
-  name: gcloud Beta Commands
-  id:  beta
-has status: Installed.
-If not, run
-        'gcloud components install beta'
-to install it. This will allow this benchmark to properly create an instance.
-"""
+"""Pgbench"""
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
+
+flags.DEFINE_integer(
+    'pgbench_scale_factor', 1, 'scale factor used to fill the database',
+    lower_bound=1)
+flags.DEFINE_integer(
+    'pgbench_seconds_per_test', 10, 'number of seconds to run each test phase',
+    lower_bound=1)
+FLAGS = flags.FLAGS
+
 
 BENCHMARK_NAME = 'pgbench'
 BENCHMARK_CONFIG = """
@@ -85,6 +59,10 @@ pgbench:
 """
 
 
+TEST_DB_NAME = 'perftest'
+DEFAULT_DB_NAME = 'postgres'
+
+
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   return config
@@ -99,25 +77,32 @@ def CheckPrerequisites(benchmark_config):
   pass
 
 
+def UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec):
+  benchmark_spec.scale_factor = FLAGS.pgbench_scale_factor
+
+def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
+  benchmark_spec.seconds_per_test = FLAGS.pgbench_seconds_per_test
+
 def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
   vm.Install('pgbench')
 
-  test_db_name = 'perftest'
-  default_db_name = 'postgres'
+  UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec)
+
   db = benchmark_spec.managed_relational_db
   endpoint = db.GetEndpoint()
   username = db.GetUsername()
   password = db.GetPassword()
   connection_string = MakePsqlConnectionString(
-      endpoint, username, password, default_db_name)
+      endpoint, username, password, DEFAULT_DB_NAME)
 
   CreateDatabase(benchmark_spec, username, password,
-                 default_db_name, endpoint, test_db_name)
+                 DEFAULT_DB_NAME, endpoint, TEST_DB_NAME)
 
-  scale_factor = 4000
-  stdout, _ = vm.RemoteCommand('pgbench -i -s {0} {1} {2}'.format(
-      scale_factor, connection_string, db_name))
+  connection_string = MakePsqlConnectionString(
+      endpoint, username, password, TEST_DB_NAME)
+  stdout, _ = vm.RemoteCommand('pgbench {0} -i -s {1}'.format(
+      connection_string, benchmark_spec.scale_factor))
 
 
 def MakePsqlConnectionString(endpoint, user, password, database):
@@ -125,29 +110,69 @@ def MakePsqlConnectionString(endpoint, user, password, database):
       endpoint, user, password, database)
 
 
+def DoesDatabaseExist(benchmark_spec, connection_string, database):
+  command = 'psql {0} -lqt | cut -d \| -f 1 | grep -qw {1}'.format(
+      connection_string, database)
+  _, _, return_value = benchmark_spec.vms[0].RemoteCommand(
+      command, ignore_failure=True, with_return_value=True)
+  return return_value == 0
+
+
 def CreateDatabase(benchmark_spec, user, password, default_database,
                    endpoint, new_database):
   connection_string = MakePsqlConnectionString(endpoint, user, password,
                                                default_database)
-  command = 'psql {0} -c "CREATE DATABASE {1};"'.format(connection_string,
-                                                        new_database)
+  if DoesDatabaseExist(benchmark_spec, connection_string, new_database):
+    command = 'psql {0} -c "DROP DATABASE {1};"'.format(
+        connection_string, new_database)
+    stdout, _ = benchmark_spec.vms[0].RemoteCommand(command, should_log=True)
+
+  command = 'psql {0} -c "CREATE DATABASE {1};"'.format(
+      connection_string, new_database)
   stdout, _ = benchmark_spec.vms[0].RemoteCommand(command, should_log=True)
 
 
+def _MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
+                           additional_metadata):
+  metadata = additional_metadata.copy()
+  metadata.update({'clients': num_clients, 'jobs': num_jobs})
+
+  lines = pgbench_stderr.splitlines()[1:]
+  tps_numbers = [float(line.split(' ')[3]) for line in lines]
+  latency_numbers = [float(line.split(' ')[6]) for line in lines]
+
+  tps_sample = sample.Sample('tps', tps_numbers, 'tps', metadata)
+  latency_sample = sample.Sample('latency', latency_numbers, 'ms', metadata)
+  return [tps_sample, latency_sample]
+
 def Run(benchmark_spec):
-  test_db_name = 'perftest'
+  UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec)
+
   db = benchmark_spec.managed_relational_db
   endpoint = db.GetEndpoint()
   username = db.GetUsername()
   password = db.GetPassword()
   connection_string = MakePsqlConnectionString(
-      endpoint, username, password, test_db_name)
+      endpoint, username, password, TEST_DB_NAME)
 
+  common_metadata = {
+      'scale_factor': benchmark_spec.scale_factor,
+      'seconds_per_test': benchmark_spec.seconds_per_test,
+  }
 
-  command = ('pgbench {0} -c 16 -j 16 -T 30 -P 1 '
-             '-r {1}'.format(connection_string, test_db_name))
-  benchmark_spec.vms[0].RemoteCommand(command, should_log=True)
-  return []
+  clients = 32
+  jobs = 16
+  command = ('pgbench {0} --client={1} --jobs={2} --time={3} --progress=1 '
+             '--report-latencies'.format(
+                 connection_string,
+                 clients,
+                 jobs,
+                 benchmark_spec.seconds_per_test))
+  stdout, stderr = benchmark_spec.vms[0].RemoteCommand(command, should_log=True)
+  print 'out', stdout
+  print 'err', stderr
+  sample = _MakeSamplesFromOutput(stderr, clients, jobs, common_metadata)
+  return [sample]
 
 
 def Cleanup(benchmark_spec):

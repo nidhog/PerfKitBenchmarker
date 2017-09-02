@@ -104,6 +104,23 @@ class BaseManagedRelationalDb(resource.BaseResource):
     super(BaseManagedRelationalDb, self).__init__()
     self.spec = managed_relational_db_spec
 
+  def GetMetadata(self):
+    """Returns a dictionary of metadata"""
+    metadata = {
+        'managed_relational_db_machine_type': self.spec.vm_spec.machine_type,
+        'managed_relational_db_cpus': self.spec.vm_spec.cpus,
+        'managed_relational_db_memory': self.spec.vm_spec.memory,
+        'managed_relational_db_zone': self.spec.vm_spec.zone,
+        'managed_relational_db_disk_type': self.spec.disk_spec.disk_type,
+        'managed_relational_db_disk_size': self.spec.disk_spec.disk_size,
+        'managed_relational_db_database': self.spec.database,
+        'managed_relational_db_high_availability': self.spec.high_availability,
+        'managed_relational_db_backup_enabled': self.spec.backup_enabled,
+        'managed_relational_db_backup_start_time': self.spec.backup_start_time,
+        'managed_relational_db_database_version': self.spec.database_version,
+    }
+    return metadata
+
   @abstractmethod
   def GetEndpoint(self):
     """Return the endpoint of the managed database.

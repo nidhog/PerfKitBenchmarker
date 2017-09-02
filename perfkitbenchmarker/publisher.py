@@ -179,6 +179,8 @@ class DefaultMetadataProvider(MetadataProvider):
                                         for vm in benchmark_spec.vms])
     if benchmark_spec.container_cluster:
       metadata.update(benchmark_spec.container_cluster.GetMetadata())
+    if benchmark_spec.managed_relational_db:
+      metadata.update(benchmark_spec.managed_relational_db.GetMetadata())
 
     for name, vms in benchmark_spec.vm_groups.iteritems():
       if len(vms) == 0:

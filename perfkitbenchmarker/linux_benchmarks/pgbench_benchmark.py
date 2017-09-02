@@ -77,8 +77,6 @@ def CheckPrerequisites(benchmark_config):
   pass
 
 
-# TODO(ferneyhough): need to figure out a way to get managed_db
-# vm_spec into metadata
 def UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec):
   benchmark_spec.scale_factor = FLAGS.pgbench_scale_factor
 

@@ -107,9 +107,6 @@ class BaseManagedRelationalDb(resource.BaseResource):
   def GetMetadata(self):
     """Returns a dictionary of metadata"""
     metadata = {
-        'managed_relational_db_machine_type': self.spec.vm_spec.machine_type,
-        'managed_relational_db_cpus': self.spec.vm_spec.cpus,
-        'managed_relational_db_memory': self.spec.vm_spec.memory,
         'managed_relational_db_zone': self.spec.vm_spec.zone,
         'managed_relational_db_disk_type': self.spec.disk_spec.disk_type,
         'managed_relational_db_disk_size': self.spec.disk_spec.disk_size,
@@ -119,6 +116,15 @@ class BaseManagedRelationalDb(resource.BaseResource):
         'managed_relational_db_backup_start_time': self.spec.backup_start_time,
         'managed_relational_db_database_version': self.spec.database_version,
     }
+    if self.spec.vm_spec.machine_type:
+      metadata.update({
+        'managed_relational_db_machine_type': self.spec.vm_spec.machine_type,
+      })
+    else:
+      metadata.update({
+        'managed_relational_db_cpus': self.spec.vm_spec.cpus,
+        'managed_relational_db_memory': self.spec.vm_spec.memory,
+      })
     return metadata
 
   @abstractmethod

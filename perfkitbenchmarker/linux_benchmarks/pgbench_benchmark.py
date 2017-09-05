@@ -39,14 +39,14 @@ pgbench:
           memory: 54GiB
         zone: us-central1-c
       AWS:
-        machine_type: db.t1.micro
+        machine_type: db.m3.medium
         zone: us-west-2a
     disk_spec:
       GCP:
         disk_size: 1000
         disk_type: pd-ssd
       AWS:
-        disk_size: 5
+        disk_size: 6144
         disk_type: gp2
   vm_groups:
     default:
@@ -55,8 +55,12 @@ pgbench:
           machine_type: n1-standard-16
           image: ubuntu-1604-xenial-v20170815a
           image_project: ubuntu-os-cloud
+          zone: us-central1-c
+        AWS:
+          machine_type: m3.medium
+          image: ami-6e1a0117
+          zone: us-west-2a
 """
-
 
 TEST_DB_NAME = 'perftest'
 DEFAULT_DB_NAME = 'postgres'

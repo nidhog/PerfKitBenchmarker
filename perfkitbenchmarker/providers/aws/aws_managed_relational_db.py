@@ -23,7 +23,7 @@ from perfkitbenchmarker.providers.aws import aws_disk
 FLAGS = flags.FLAGS
 
 DEFAULT_MYSQL_VERSION = '5.7.11'
-
+DEFAULT_POSTGRES_VERSION = '9.6.2'
 
 class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """An object representing an AWS managed relational database.
@@ -55,7 +55,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if database == managed_relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
     elif database == managed_relational_db.POSTGRES:
-      raise NotImplementedError('Postgres not supported on AWS')
+      return DEFAULT_POSTGRES_VERSION
 
   def GetEndpoint(self):
     return self.endpoint

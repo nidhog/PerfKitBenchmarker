@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import json
+import logging
+import time
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
@@ -170,18 +173,31 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
+    timeout = 60 * 60 * 6 # 6 hours. (RDS HA takes a long time to prepare)
     cmd = util.AWS_PREFIX + [
         'rds',
         'describe-db-instances',
         '--db-instance-identifier=%s' % self.instance_id,
         '--region=%s' % self.region
     ]
-    stdout, _, _ = vm_util.IssueCommand(cmd)
-    json_output = json.loads(stdout)
-    is_ready = (json_output['DBInstances'][0]['DBInstanceStatus']
-                == 'available')
-    if not is_ready:
-      return False
+    start_time = datetime.datetime.now()
+
+    while True:
+      if (datetime.datetime.now() - start_time).seconds > timeout:
+        loggine.exception('Timeout waiting for sql instance to be ready')
+        return False
+      time.sleep(5)
+      stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
+
+      try:
+        json_output = json.loads(stdout)
+        state = json_output['DBInstances'][0]['DBInstanceStatus']
+        logging.info('Instance state: {0}'.format(state))
+        if state == 'available':
+          break
+      except:
+        logging.exception('Error attempting to read stdout. Creation failure.')
+        return False
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = self._ParsePort(json_output)
     return True

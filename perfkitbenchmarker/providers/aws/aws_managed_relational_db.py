@@ -47,7 +47,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.zone = self.spec.vm_spec.zone
     self.region = util.GetRegionFromZone(self.zone)
-    # TODO(ferneyhough): assert if client_vm is in different region than DB
 
   @staticmethod
   def GetDefaultDatabaseVersion(database):
@@ -68,26 +67,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def GetPort(self):
     return self.port
-
-  def _AuthorizeDbSecurityGroup(self):
-    cidr_to_authorize = '0.0.0.0/0'
-    cmd = util.AWS_PREFIX + [
-        'rds',
-        'authorize-db-security-group-ingress',
-        '--db-security-group-name=%s' % self.security_group_name,
-        '--cidrip=%s' % cidr_to_authorize
-    ]
-    vm_util.IssueCommand(cmd)
-
-  def _CreateDbSecurityGroup(self):
-    self.security_group_name = 'pkb-db-security-group-%s' % FLAGS.run_uri
-    cmd = util.AWS_PREFIX + [
-        'rds',
-        'create-db-security-group',
-        '--db-security-group-name=%s' % self.security_group_name,
-        '--db-security-group-description=%s' % 'created by PKB'
-    ]
-    vm_util.IssueCommand(cmd)
 
   def _GetNewZones(self):
     # Get a list of zones, excluding the one that the VM is in.
@@ -144,9 +123,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.spec.db_subnet_group_name = db_subnet_group_name
 
   def _SetupNetworking(self):
-    #self._CreateDbSecurityGroup()
-    #self._AuthorizeDbSecurityGroup()
-
     zone =  self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     new_subnet = self._CreateSubnetInAdditionalZone()
@@ -166,13 +142,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
                  stdout, stderr)
 
   def _TeardownNetworking(self):
-    #cmd = util.AWS_PREFIX + [
-    #    'rds',
-    #    'delete-db-security-group',
-    #    '--db-security-group-name=%s' % self.security_group_name
-    #]
-    #vm_util.IssueCommand(cmd)
-
     zone =  self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     if hasattr(self.spec, 'db_subnet_group_name'):
@@ -183,7 +152,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           '--region', region]
       stdout, stderr, _ = vm_util.IssueCommand(delete_db_subnet_group_cmd)
 
-    # TODO(ferneyhough): this does not appear to be deleting correctly
     if hasattr(self.spec, 'extra_subnet_for_db'):
       self.spec.extra_subnet_for_db.Delete()
 
@@ -201,7 +169,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--storage-type=%s' % self.spec.disk_spec.disk_type,
         '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
         '--no-auto-minor-version-upgrade',
-        #'--db-security-groups=%s' % self.security_group_name,
         '--region=%s' % self.region,
         '--engine-version=%s' % self.spec.database_version,
         '--db-subnet-group-name=%s' % self.spec.db_subnet_group_name,
@@ -309,14 +276,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     flexibility in creating resource dependencies separately from _Create().
     """
     self._SetupNetworking()
-
-  def _PreDelete(self):
-    pass
-    # TODO(ferneyhough): this is strange in that we are calling _Delete()
-    # from PreDelete, but the database has to be removed first
-    #self._Delete()
-    #self._TeardownNetworking()
-
 
   def _DeleteDependencies(self):
     """Method that will be called once after _DeleteResource() is called.

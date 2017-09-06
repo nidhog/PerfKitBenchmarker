@@ -110,14 +110,6 @@ class BaseResource(object):
     """
     pass
 
-  def _PreDelete(self):
-    """Method that will be once before _DeleteResource() is called.
-
-    Supplying this method is optional. It is intended to allow additional
-    flexibility in deleting resource dependencies separately from _Delete().
-    """
-    pass
-
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def _CreateResource(self):
     """Reliably creates the underlying resource."""
@@ -176,6 +168,5 @@ class BaseResource(object):
     """Deletes a resource and its dependencies."""
     if self.user_managed:
       return
-    self._PreDelete()
     self._DeleteResource()
     self._DeleteDependencies()

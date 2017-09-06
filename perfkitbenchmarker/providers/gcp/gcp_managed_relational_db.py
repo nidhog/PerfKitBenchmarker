@@ -127,7 +127,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       self._ValidateMachineType(memory, cpus)
       cmd_string.append('--cpu={}'.format(cpus))
       cmd_string.append('--memory={}MiB'.format(memory))
-    if self.spec.high_availability:
+    # postgres HA requires a manual curl command to enable,
+    # so don't do anything special. the samples will still have
+    # high_availability in the metadata, so be sure to enable it
+    # if the flag is specified.
+    if (self.spec.high_availability and
+        self.spec.database == managed_relational_db.MYSQL):
       ha_flag = '--failover-replica-name=replica-' + self.instance_id
       cmd_string.append(ha_flag)
     if self.spec.backup_enabled:

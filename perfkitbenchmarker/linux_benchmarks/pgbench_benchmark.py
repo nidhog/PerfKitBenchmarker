@@ -36,11 +36,11 @@ pgbench:
       GCP:
         machine_type:
           cpus: 16
-          memory: 54GiB
+          memory: 64GiB
         zone: us-central1-c
       AWS:
-        machine_type: db.m3.medium
-        zone: us-west-2a
+        machine_type: db.m4.4xlarge
+        zone: us-west-1a
     disk_spec:
       GCP:
         disk_size: 1000
@@ -57,9 +57,9 @@ pgbench:
           image_project: ubuntu-os-cloud
           zone: us-central1-c
         AWS:
-          machine_type: m3.medium
-          image: ami-6e1a0117
-          zone: us-west-2a
+          machine_type: m4.4xlarge
+          image: ami-09d2fb69
+          zone: us-west-1a
 """
 
 TEST_DB_NAME = 'perftest'
@@ -107,7 +107,7 @@ def Prepare(benchmark_spec):
 
   connection_string = MakePsqlConnectionString(
       endpoint, username, password, TEST_DB_NAME)
-  stdout, _ = vm.RemoteCommand('pgbench {0} -i -s {1}'.format(
+  stdout, _ = vm.RobustRemoteCommand('pgbench {0} -i -s {1}'.format(
       connection_string, benchmark_spec.scale_factor))
 
 
@@ -181,7 +181,7 @@ def Run(benchmark_spec):
                    client,
                    jobs,
                    benchmark_spec.seconds_per_test))
-    stdout, stderr = benchmark_spec.vms[0].RemoteCommand(
+    stdout, stderr = benchmark_spec.vms[0].RobustRemoteCommand(
         command, should_log=True)
     samples.extend(_MakeSamplesFromOutput(
         stderr, client, jobs, common_metadata))

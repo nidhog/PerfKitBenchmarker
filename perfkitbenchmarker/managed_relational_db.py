@@ -104,6 +104,10 @@ class BaseManagedRelationalDb(resource.BaseResource):
     super(BaseManagedRelationalDb, self).__init__()
     self.spec = managed_relational_db_spec
 
+  def AddClientVms(self, vms):
+    self.client_vms = vms
+    self.network = vms[0].network
+
   def GetMetadata(self):
     """Returns a dictionary of metadata"""
     metadata = {

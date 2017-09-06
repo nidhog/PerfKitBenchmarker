@@ -22,11 +22,13 @@ from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_network
 
 FLAGS = flags.FLAGS
 
 DEFAULT_MYSQL_VERSION = '5.7.11'
 DEFAULT_POSTGRES_VERSION = '9.6.2'
+DEFAULT_POSTGRES_PORT = 5432
 
 class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """An object representing an AWS managed relational database.
@@ -86,22 +88,108 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     ]
     vm_util.IssueCommand(cmd)
 
+  def _GetNewZones(self):
+    # Get a list of zones, excluding the one that the VM is in.
+    zone =  self.spec.vm_spec.zone
+    region = util.GetRegionFromZone(zone)
+    get_zones_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-availability-zones',
+        '--region={0}'.format(region)
+    ]
+    stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
+    response = json.loads(stdout)
+    all_zones = [item['ZoneName'] for item in response['AvailabilityZones']
+                 if item['State'] == 'available']
+    all_zones.remove(zone)
+    return all_zones
+
+  def _CreateSubnetInAdditionalZone(self):
+    # Now create a new subnet in the zone that's different from where the VM is
+    new_subnet_zones = self._GetNewZones()
+    while len(new_subnet_zones) >= 1:
+      try:
+        new_subnet_zone = new_subnet_zones.pop()
+        logging.info('Attempting to create a second subnet in zone %s',
+                     new_subnet_zone)
+        new_subnet = aws_network.AwsSubnet(new_subnet_zone,
+                                           self.network.regional_network.vpc.id,
+                                           '10.0.1.0/24')
+        new_subnet.Create()
+        logging.info('Successfully created a new subnet, subnet id is: %s',
+                     new_subnet.id)
+
+        # save for cleanup
+        self.spec.extra_subnet_for_db = new_subnet
+        return new_subnet
+      except:
+        logging.info('Unable to create subnet in zone %s', new_subnet_zone)
+    raise Exception('Unable to create subnet in any availability zones')
+
+  def _CreateDbSubnetGroup(self, new_subnet):
+    # Now we can create a new DB subnet group that has two subnets in it.
+    zone =  self.spec.vm_spec.zone
+    region = util.GetRegionFromZone(zone)
+    db_subnet_group_name = 'pkb-db-subnet-group-{0}'.format(FLAGS.run_uri)
+    create_db_subnet_group_cmd = util.AWS_PREFIX + [
+        'rds',
+        'create-db-subnet-group',
+        '--db-subnet-group-name', db_subnet_group_name,
+        '--db-subnet-group-description', 'pkb_subnet_group_for_db',
+        '--subnet-ids', self.network.subnet.id, new_subnet.id,
+        '--region', region]
+    stdout, stderr, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
+    logging.info('Created a DB subnet group, stdout is:\n%s\nstderr is:\n%s',
+                 stdout, stderr)
+    # save for cleanup
+    self.spec.db_subnet_group_name = db_subnet_group_name
+
   def _SetupNetworking(self):
-    self._CreateDbSecurityGroup()
-    self._AuthorizeDbSecurityGroup()
-    # vpc = self.spec.vm_spec.network.regional_network.vpc
-    # next_cidr_block = self.vpc.NextCidrBlock()
+    #self._CreateDbSecurityGroup()
+    #self._AuthorizeDbSecurityGroup()
+
+    zone =  self.spec.vm_spec.zone
+    region = util.GetRegionFromZone(zone)
+    new_subnet = self._CreateSubnetInAdditionalZone()
+    self._CreateDbSubnetGroup(new_subnet)
+    group_id = self.network.regional_network.vpc.default_security_group_id
+
+    open_port_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'authorize-security-group-ingress',
+        '--group-id', group_id,
+        '--source-group', group_id,
+        '--protocol', 'tcp',
+        '--port={0}'.format(DEFAULT_POSTGRES_PORT),
+        '--region', region]
+    stdout, stderr, _ = vm_util.IssueCommand(open_port_cmd)
+    logging.info('Granted DB port ingress, stdout is:\n%s\nstderr is:\n%s',
+                 stdout, stderr)
 
   def _TeardownNetworking(self):
-    cmd = util.AWS_PREFIX + [
-        'rds',
-        'delete-db-security-group',
-        '--db-security-group-name=%s' % self.security_group_name
-    ]
-    vm_util.IssueCommand(cmd)
+    #cmd = util.AWS_PREFIX + [
+    #    'rds',
+    #    'delete-db-security-group',
+    #    '--db-security-group-name=%s' % self.security_group_name
+    #]
+    #vm_util.IssueCommand(cmd)
+
+    if hasattr(self.spec, 'db_subnet_group_name'):
+      delete_db_subnet_group_cmd = util.AWS_PREFIX + [
+          'rds',
+          'delete-db-subnet-group',
+          '--db-subnet-group-name', self.spec.db_subnet_group_name]
+      stdout, stderr, _ = vm_util.IssueCommand(delete_db_subnet_group_cmd)
+      logging.info('Deleted the db subnet group. stdout is:\n%s, stderr: \n%s',
+                   stdout, stderr)
+
+    # TODO(ferneyhough): this does not appear to be deleting correctly
+    if hasattr(self.spec, 'extra_subnet_for_db'):
+      self.spec.extra_subnet_for_db.Delete()
 
   def _Create(self):
     """Creates the AWS RDS instance"""
+    group_id = self.network.regional_network.vpc.default_security_group_id
     cmd = util.AWS_PREFIX + [
         'rds',
         'create-db-instance',
@@ -113,9 +201,11 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--storage-type=%s' % self.spec.disk_spec.disk_type,
         '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
         '--no-auto-minor-version-upgrade',
-        '--db-security-groups=%s' % self.security_group_name,
+        #'--db-security-groups=%s' % self.security_group_name,
         '--region=%s' % self.region,
-        '--engine-version=%s' % self.spec.database_version
+        '--engine-version=%s' % self.spec.database_version,
+        '--db-subnet-group-name=%s' % self.spec.db_subnet_group_name,
+        '--vpc-security-group-ids=%s' % group_id,
     ]
 
     if self.spec.disk_spec.disk_type == aws_disk.IO1:
@@ -219,10 +309,15 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     self._SetupNetworking()
 
+  def _PreDelete(self):
+    print 'PREDELETE!'
+    self._TeardownNetworking()
+
+
   def _DeleteDependencies(self):
     """Method that will be called once after _DeleteResource() is called.
 
     Supplying this method is optional. It is intended to allow additional
     flexibility in deleting resource dependencies separately from _Delete().
     """
-    self._TeardownNetworking()
+    #self._TeardownNetworking()

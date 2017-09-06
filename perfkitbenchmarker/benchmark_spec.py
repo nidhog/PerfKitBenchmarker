@@ -350,6 +350,8 @@ class BenchmarkSpec(object):
     if self.dpb_service:
       self.dpb_service.Create()
     if self.managed_relational_db:
+      # TODO(ferneyhough): this can probably go in a more appropriate place
+      self.managed_relational_db.AddClientVms(self.vms)
       self.managed_relational_db.Create()
 
   def Delete(self):

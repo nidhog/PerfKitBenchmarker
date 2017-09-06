@@ -47,6 +47,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.zone = self.spec.vm_spec.zone
     self.region = util.GetRegionFromZone(self.zone)
+    # TODO(ferneyhough): assert if client_vm is in different region than DB
 
   @staticmethod
   def GetDefaultDatabaseVersion(database):
@@ -139,8 +140,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--subnet-ids', self.network.subnet.id, new_subnet.id,
         '--region', region]
     stdout, stderr, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
-    logging.info('Created a DB subnet group, stdout is:\n%s\nstderr is:\n%s',
-                 stdout, stderr)
     # save for cleanup
     self.spec.db_subnet_group_name = db_subnet_group_name
 
@@ -174,14 +173,15 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     #]
     #vm_util.IssueCommand(cmd)
 
+    zone =  self.spec.vm_spec.zone
+    region = util.GetRegionFromZone(zone)
     if hasattr(self.spec, 'db_subnet_group_name'):
       delete_db_subnet_group_cmd = util.AWS_PREFIX + [
           'rds',
           'delete-db-subnet-group',
-          '--db-subnet-group-name', self.spec.db_subnet_group_name]
+          '--db-subnet-group-name', self.spec.db_subnet_group_name,
+          '--region', region]
       stdout, stderr, _ = vm_util.IssueCommand(delete_db_subnet_group_cmd)
-      logging.info('Deleted the db subnet group. stdout is:\n%s, stderr: \n%s',
-                   stdout, stderr)
 
     # TODO(ferneyhough): this does not appear to be deleting correctly
     if hasattr(self.spec, 'extra_subnet_for_db'):
@@ -227,7 +227,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         'rds',
         'delete-db-instance',
         '--db-instance-identifier=%s' % self.instance_id,
-        '--skip-final-snapshot'
+        '--skip-final-snapshot',
+        '--region', self.region,
     ]
     vm_util.IssueCommand(cmd)
 
@@ -310,8 +311,11 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self._SetupNetworking()
 
   def _PreDelete(self):
-    print 'PREDELETE!'
-    self._TeardownNetworking()
+    pass
+    # TODO(ferneyhough): this is strange in that we are calling _Delete()
+    # from PreDelete, but the database has to be removed first
+    #self._Delete()
+    #self._TeardownNetworking()
 
 
   def _DeleteDependencies(self):
@@ -320,4 +324,4 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Supplying this method is optional. It is intended to allow additional
     flexibility in deleting resource dependencies separately from _Delete().
     """
-    #self._TeardownNetworking()
+    self._TeardownNetworking()

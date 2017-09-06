@@ -105,6 +105,8 @@ class BaseManagedRelationalDb(resource.BaseResource):
     self.spec = managed_relational_db_spec
 
   def AddClientVms(self, vms):
+    # TODO(ferneyhough): assert # of VMs, and that VM(s) are in same
+    # region as DB
     self.client_vms = vms
     self.network = vms[0].network
 

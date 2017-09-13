@@ -13,6 +13,11 @@
 # limitations under the License.
 """Pgbench"""
 
+# TODO(ferneyhough):
+# - save raw pgbench output and push to gcs bucket
+
+import time
+
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -23,6 +28,9 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'pgbench_seconds_per_test', 10, 'number of seconds to run each test phase',
     lower_bound=1)
+flags.DEFINE_integer(
+    'pgbench_seconds_to_pause_before_steps', 30,
+    'number of seconds to pause before each client load step')
 FLAGS = flags.FLAGS
 
 
@@ -87,6 +95,7 @@ def UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec):
 
 def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
   benchmark_spec.seconds_per_test = FLAGS.pgbench_seconds_per_test
+  benchmark_spec.seconds_to_pause = FLAGS.pgbench_seconds_to_pause_before_steps
 
 
 def Prepare(benchmark_spec):
@@ -169,11 +178,13 @@ def Run(benchmark_spec):
   common_metadata = {
       'scale_factor': benchmark_spec.scale_factor,
       'seconds_per_test': benchmark_spec.seconds_per_test,
+      'seconds_to_pause_before_steps': benchmark_spec.seconds_to_pause,
   }
 
   clients = [1, 2, 4, 8, 16, 32, 64]
   samples = []
   for client in clients:
+    time.sleep(benchmark_spec.seconds_to_pause)
     jobs = min(client, 16)
     command = ('pgbench {0} --client={1} --jobs={2} --time={3} --progress=1 '
                '--report-latencies'.format(

@@ -403,6 +403,7 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
+    # TODO(ferneyhough): add flags for managed db zone, machine spec, and disk
     super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud

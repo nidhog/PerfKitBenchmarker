@@ -20,6 +20,7 @@ import time
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 
 flags.DEFINE_integer(
@@ -31,6 +32,11 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'pgbench_seconds_to_pause_before_steps', 30,
     'number of seconds to pause before each client load step')
+flag_util.DEFINE_integerlist(
+    'pgbench_client_counts',
+    flag_util.IntegerList([1, 2, 4, 8, 16, 32, 64]),
+    'array of client counts passed to pgbench',
+    on_nonincreasing=flag_util.IntegerListParser.WARN)
 FLAGS = flags.FLAGS
 
 
@@ -55,7 +61,8 @@ pgbench:
         disk_type: pd-ssd
       AWS:
         disk_size: 6144
-        disk_type: gp2
+        disk_type: io1
+        iops: 30000
   vm_groups:
     default:
       vm_spec:
@@ -96,7 +103,7 @@ def UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec):
 def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
   benchmark_spec.seconds_per_test = FLAGS.pgbench_seconds_per_test
   benchmark_spec.seconds_to_pause = FLAGS.pgbench_seconds_to_pause_before_steps
-
+  benchmark_spec.client_counts = FLAGS.pgbench_client_counts
 
 def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
@@ -181,9 +188,8 @@ def Run(benchmark_spec):
       'seconds_to_pause_before_steps': benchmark_spec.seconds_to_pause,
   }
 
-  clients = [1, 2, 4, 8, 16, 32, 64]
   samples = []
-  for client in clients:
+  for client in benchmark_spec.client_counts:
     time.sleep(benchmark_spec.seconds_to_pause)
     jobs = min(client, 16)
     command = ('pgbench {0} --client={1} --jobs={2} --time={3} --progress=1 '

@@ -116,6 +116,7 @@ class BaseManagedRelationalDb(resource.BaseResource):
         'managed_relational_db_zone': self.spec.vm_spec.zone,
         'managed_relational_db_disk_type': self.spec.disk_spec.disk_type,
         'managed_relational_db_disk_size': self.spec.disk_spec.disk_size,
+        'managed_relational_db_disk_iops': self.spec.disk_spec.iops,
         'managed_relational_db_database': self.spec.database,
         'managed_relational_db_high_availability': self.spec.high_availability,
         'managed_relational_db_backup_enabled': self.spec.backup_enabled,

@@ -363,7 +363,9 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
         }),
         'database': (option_decoders.EnumDecoder, {
             'valid_values': [
-                managed_relational_db.MYSQL, managed_relational_db.POSTGRES
+                managed_relational_db.MYSQL,
+                managed_relational_db.POSTGRES,
+                managed_relational_db.AURORA_POSTGRES,
             ]
         }),
         'database_name': (option_decoders.StringDecoder, {

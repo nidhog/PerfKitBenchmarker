@@ -53,6 +53,7 @@ flags.RegisterValidator('database_backup_start_time',
 
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
+AURORA_POSTGRES = 'aurora-postgresql'
 
 _MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
@@ -108,6 +109,8 @@ class BaseManagedRelationalDb(resource.BaseResource):
     # TODO(ferneyhough): assert # of VMs, and that VM(s) are in same
     # region as DB
     self.client_vms = vms
+    if not self.client_vms:
+      return
     self.network = vms[0].network
 
   def GetMetadata(self):

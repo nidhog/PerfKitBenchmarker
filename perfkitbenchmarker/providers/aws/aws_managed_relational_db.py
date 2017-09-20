@@ -61,6 +61,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       return DEFAULT_MYSQL_VERSION
     elif database == managed_relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
+    elif database == managed_relational_db.AURORA_POSTGRES:
+      return DEFAULT_POSTGRES_VERSION
 
   def GetEndpoint(self):
     return self.endpoint

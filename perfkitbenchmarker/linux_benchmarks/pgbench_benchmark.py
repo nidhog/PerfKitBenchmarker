@@ -50,7 +50,7 @@ pgbench:
       GCP:
         machine_type:
           cpus: 16
-          memory: 64GiB
+          memory: 104GiB
         zone: us-central1-c
       AWS:
         machine_type: db.m4.4xlarge
@@ -61,8 +61,7 @@ pgbench:
         disk_type: pd-ssd
       AWS:
         disk_size: 6144
-        disk_type: io1
-        iops: 30000
+        disk_type: gp2
   vm_groups:
     default:
       vm_spec:
@@ -76,6 +75,7 @@ pgbench:
           image: ami-09d2fb69
           zone: us-west-1a
 """
+
 
 TEST_DB_NAME = 'perftest'
 DEFAULT_DB_NAME = 'postgres'

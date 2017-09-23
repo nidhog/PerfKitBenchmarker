@@ -55,6 +55,9 @@ pgbench:
       AWS:
         machine_type: db.m4.4xlarge
         zone: us-west-1a
+      Azure:
+        machine_type: Standard_D2s_v3
+        zone: westus
     disk_spec:
       GCP:
         disk_size: 1000
@@ -62,6 +65,8 @@ pgbench:
       AWS:
         disk_size: 6144
         disk_type: gp2
+      Azure:
+        disk_size: 1000
   vm_groups:
     default:
       vm_spec:
@@ -74,6 +79,9 @@ pgbench:
           machine_type: m4.4xlarge
           image: ami-09d2fb69
           zone: us-west-1a
+        Azure:
+          machine_type: Standard_A2_v2
+          zone: westus
 """
 
 

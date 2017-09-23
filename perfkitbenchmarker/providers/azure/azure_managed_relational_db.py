@@ -103,7 +103,15 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
-    pass
+    cmd = [
+        azure.AZURE_PATH,
+        'postgres',
+        'server',
+        'delete',
+        '-y',
+        '--name', self.instance_id,
+    ] + self.resource_group.args
+    vm_util.IssueCommand(cmd)
 
   def _RunServerShowCommand(self):
     cmd = [

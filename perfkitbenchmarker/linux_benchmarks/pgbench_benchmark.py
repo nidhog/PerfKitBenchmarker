@@ -81,6 +81,7 @@ pgbench:
           zone: us-west-1a
         Azure:
           machine_type: Standard_A2_v2
+          image: Canonical:UbuntuServer:16.04-LTS:latest
           zone: westus
 """
 
@@ -138,7 +139,7 @@ def Prepare(benchmark_spec):
 
 
 def MakePsqlConnectionString(endpoint, user, password, database):
-  return '\'host={0} user={1} password={2} dbname={3} sslmode=require\''.format(
+  return '\'host={0} user={1} password={2} dbname={3}\''.format(
       endpoint, user, password, database)
 
 

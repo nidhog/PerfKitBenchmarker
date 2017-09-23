@@ -140,10 +140,14 @@ class BaseManagedRelationalDb(resource.BaseResource):
         'managed_relational_db_machine_type': self.spec.vm_spec.machine_type,
       })
     else:
-      metadata.update({
-        'managed_relational_db_cpus': self.spec.vm_spec.cpus,
-        'managed_relational_db_memory': self.spec.vm_spec.memory,
-      })
+      # TOOD(ferneyhough): fix this. Azure has no vm_spec, so need to try
+      try:
+        metadata.update({
+          'managed_relational_db_cpus': self.spec.vm_spec.cpus,
+          'managed_relational_db_memory': self.spec.vm_spec.memory,
+        })
+      except:
+        pass
 
     try:
       metadata.update({

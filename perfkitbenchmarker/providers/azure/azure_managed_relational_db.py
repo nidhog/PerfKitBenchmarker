@@ -43,7 +43,7 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def __init__(self, managed_relational_db_spec):
     super(AzureManagedRelationalDb, self).__init__(managed_relational_db_spec)
 
-    if self.spec.high_availability:
+    if not self.spec.high_availability:
       raise Exception('Azure only supports high-availability configurations')
     self.spec = managed_relational_db_spec
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri

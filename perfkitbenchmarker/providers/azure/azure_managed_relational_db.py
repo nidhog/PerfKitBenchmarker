@@ -168,6 +168,20 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.endpoint = self._ParseEndpoint(json_output)
     return True
 
+  def _AuthorizeIpAddress(self, ip_address):
+    print 'authorizing', ip_address
+    cmd = [
+        azure.AZURE_PATH,
+        'postgres',
+        'server',
+        'firewall-rule', 'create',
+        '--server', self.instance_id,
+        '--name', 'AllowIps',
+        '--start-ip-address', ip_address,
+        '--end-ip-address', ip_address,
+    ] + self.resource_group.args
+    vm_util.IssueCommand(cmd)
+
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.
 
@@ -175,20 +189,4 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     once, after the resource is confirmed to exist. It is intended to allow
     data about the resource to be collected or for the resource to be tagged.
     """
-    pass
-
-  def _CreateDependencies(self):
-    """Method that will be called once before _CreateResource() is called.
-
-    Supplying this method is optional. It is intended to allow additional
-    flexibility in creating resource dependencies separately from _Create().
-    """
-    pass
-
-  def _DeleteDependencies(self):
-    """Method that will be called once after _DeleteResource() is called.
-
-    Supplying this method is optional. It is intended to allow additional
-    flexibility in deleting resource dependencies separately from _Delete().
-    """
-    pass
+    self._AuthorizeIpAddress(self.client_vms[0].ip_address)

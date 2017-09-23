@@ -121,8 +121,10 @@ def Prepare(benchmark_spec):
 
   db = benchmark_spec.managed_relational_db
   endpoint = db.GetEndpoint()
-  username = db.GetUsername()
   password = db.GetPassword()
+  hostname = db.instance_id
+  username = db.GetUsername() + '@' + hostname
+
   connection_string = MakePsqlConnectionString(
       endpoint, username, password, DEFAULT_DB_NAME)
 
@@ -136,7 +138,7 @@ def Prepare(benchmark_spec):
 
 
 def MakePsqlConnectionString(endpoint, user, password, database):
-  return '\'host={0} user={1} password={2} dbname={3}\''.format(
+  return '\'host={0} user={1} password={2} dbname={3} sslmode=require\''.format(
       endpoint, user, password, database)
 
 
@@ -185,8 +187,10 @@ def Run(benchmark_spec):
 
   db = benchmark_spec.managed_relational_db
   endpoint = db.GetEndpoint()
-  username = db.GetUsername()
   password = db.GetPassword()
+  hostname = db.instance_id
+  username = db.GetUsername() + '@' + hostname
+
   connection_string = MakePsqlConnectionString(
       endpoint, username, password, TEST_DB_NAME)
 

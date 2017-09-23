@@ -78,39 +78,6 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       return DEFAULT_POSTGRES_PORT
     raise Exception('PKB only supports Postgres databases on Azure')
 
-  #def _SetupNetworking(self):
-  #  zone =  self.spec.vm_spec.zone
-  #  region = util.GetRegionFromZone(zone)
-  #  new_subnet = self._CreateSubnetInAdditionalZone()
-  #  self._CreateDbSubnetGroup(new_subnet)
-  #  group_id = self.network.regional_network.vpc.default_security_group_id
-
-  #  open_port_cmd = util.AWS_PREFIX + [
-  #      'ec2',
-  #      'authorize-security-group-ingress',
-  #      '--group-id', group_id,
-  #      '--source-group', group_id,
-  #      '--protocol', 'tcp',
-  #      '--port={0}'.format(DEFAULT_POSTGRES_PORT),
-  #      '--region', region]
-  #  stdout, stderr, _ = vm_util.IssueCommand(open_port_cmd)
-  #  logging.info('Granted DB port ingress, stdout is:\n%s\nstderr is:\n%s',
-  #               stdout, stderr)
-
-  #def _TeardownNetworking(self):
-  #  zone =  self.spec.vm_spec.zone
-  #  region = util.GetRegionFromZone(zone)
-  #  if hasattr(self.spec, 'db_subnet_group_name'):
-  #    delete_db_subnet_group_cmd = util.AWS_PREFIX + [
-  #        'rds',
-  #        'delete-db-subnet-group',
-  #        '--db-subnet-group-name', self.spec.db_subnet_group_name,
-  #        '--region', region]
-  #    stdout, stderr, _ = vm_util.IssueCommand(delete_db_subnet_group_cmd)
-
-  #  if hasattr(self.spec, 'extra_subnet_for_db'):
-  #    self.spec.extra_subnet_for_db.Delete()
-
   def _Create(self):
     """Creates the Azure database instance"""
     cmd = [
@@ -143,7 +110,7 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         azure.AZURE_PATH,
         'postgres',
         'server',
-        'show'
+        'show',
         '--name', self.instance_id,
     ] + self.resource_group.args
     return vm_util.IssueCommand(cmd, suppress_warning=True)

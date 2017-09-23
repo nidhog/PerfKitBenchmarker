@@ -56,7 +56,6 @@ pgbench:
         machine_type: db.m4.4xlarge
         zone: us-west-1a
       Azure:
-        machine_type: Standard_D2s_v3
         zone: westus
     disk_spec:
       GCP:
@@ -121,26 +120,13 @@ def Prepare(benchmark_spec):
   UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec)
 
   db = benchmark_spec.managed_relational_db
-  endpoint = db.GetEndpoint()
-  password = db.GetPassword()
-  hostname = db.instance_id
-  username = db.GetUsername() + '@' + hostname
+  connection_string = db.MakePsqlConnectionString(DEFAULT_DB_NAME)
 
-  connection_string = MakePsqlConnectionString(
-      endpoint, username, password, DEFAULT_DB_NAME)
+  CreateDatabase(benchmark_spec, DEFAULT_DB_NAME, TEST_DB_NAME)
 
-  CreateDatabase(benchmark_spec, username, password,
-                 DEFAULT_DB_NAME, endpoint, TEST_DB_NAME)
-
-  connection_string = MakePsqlConnectionString(
-      endpoint, username, password, TEST_DB_NAME)
+  connection_string = db.MakePsqlConnectionString(TEST_DB_NAME)
   stdout, _ = vm.RobustRemoteCommand('pgbench {0} -i -s {1}'.format(
       connection_string, benchmark_spec.scale_factor))
-
-
-def MakePsqlConnectionString(endpoint, user, password, database):
-  return '\'host={0} user={1} password={2} dbname={3}\''.format(
-      endpoint, user, password, database)
 
 
 def DoesDatabaseExist(benchmark_spec, connection_string, database):
@@ -151,10 +137,10 @@ def DoesDatabaseExist(benchmark_spec, connection_string, database):
   return return_value == 0
 
 
-def CreateDatabase(benchmark_spec, user, password, default_database,
-                   endpoint, new_database):
-  connection_string = MakePsqlConnectionString(endpoint, user, password,
-                                               default_database)
+def CreateDatabase(benchmark_spec, default_database, new_database):
+  db = benchmark_spec.managed_relational_db
+  connection_string = db.MakePsqlConnectionString(default_database)
+
   if DoesDatabaseExist(benchmark_spec, connection_string, new_database):
     command = 'psql {0} -c "DROP DATABASE {1};"'.format(
         connection_string, new_database)
@@ -187,13 +173,7 @@ def Run(benchmark_spec):
   UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec)
 
   db = benchmark_spec.managed_relational_db
-  endpoint = db.GetEndpoint()
-  password = db.GetPassword()
-  hostname = db.instance_id
-  username = db.GetUsername() + '@' + hostname
-
-  connection_string = MakePsqlConnectionString(
-      endpoint, username, password, TEST_DB_NAME)
+  connection_string = db.MakePsqlConnectionString(TEST_DB_NAME)
 
   common_metadata = {
       'scale_factor': benchmark_spec.scale_factor,

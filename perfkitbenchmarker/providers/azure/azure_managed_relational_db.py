@@ -42,6 +42,9 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def __init__(self, managed_relational_db_spec):
     super(AzureManagedRelationalDb, self).__init__(managed_relational_db_spec)
+
+    if self.spec.high_availability:
+      raise Exception('Azure only supports high-availability configurations')
     self.spec = managed_relational_db_spec
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.zone = self.spec.vm_spec.zone
@@ -56,6 +59,14 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """100 compute units equate to a single CPU without hyperthreading"""
     return cpus * 100
 
+  def GetMetadata(self):
+    metadata = super(AzureManagedRelationalDb, self).GetMetadata()
+    metadata.update({
+      'managed_relational_db_compute_units': self.compute_units,
+      'managed_relational_db_performance_tier': self.performance_tier,
+    })
+    return metadata
+
   @staticmethod
   def GetDefaultDatabaseVersion(database):
     """Returns the default version of a given database.
@@ -68,6 +79,13 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if database == managed_relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
     raise Exception('PKB only supports Postgres databases on Azure')
+
+  def MakePsqlConnectionString(self, database_name):
+    return '\'host={0} user={1} password={2} dbname={3}\''.format(
+        self.GetEndpoint(),
+        self.GetUsername() + '@' + self.instance_id,
+        self.GetPassword(),
+        database_name)
 
   def GetEndpoint(self):
     return self.endpoint

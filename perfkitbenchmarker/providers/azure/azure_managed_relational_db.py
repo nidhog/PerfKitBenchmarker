@@ -52,7 +52,7 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     #self.compute_units = _ConvertCpusToComputeUnit(self.spec.vm_spec.cpus)
     # TODO: need to find a way to specify compute units and performance tier
     # in the spec
-    self.compute_units = 400
+    self.compute_units = 800
     self.performance_tier = "Standard"
 
   def _ConvertCpusToComputeUnits(cpus):

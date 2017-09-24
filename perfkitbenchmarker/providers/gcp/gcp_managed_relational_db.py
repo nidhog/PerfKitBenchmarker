@@ -37,6 +37,8 @@ import datetime
 import json
 import logging
 import time
+import os
+import subprocess
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -277,6 +279,14 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
 
+  def _EnableHighAvailability(self):
+    print 'Using CURL to enable high availability'
+    enable_ha_script_path = data.ResourcePath('enable_gcp_ha.sh')
+    subprocess.check_call([enable_ha_script_path], shell=True,
+                          env=dict(os.environ, INSTANCENAME=self.instance_id))
+    print 'Done. Waiting for 5 minutes for changes to take effect'
+    time.sleep(5*60)
+
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.
 
@@ -284,6 +294,9 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     once, after the resource is confirmed to exist. It is intended to allow
     data about the resource to be collected or for the resource to be tagged.
     """
+    if self.spec.high_availability:
+      self._EnableHighAvailability()
+
     # TODO(ferneyhough): raise exception on failure
     cmd = util.GcloudCommand(
         self, 'sql', 'users', 'create', self.GetUsername(), 'dummy_host',

@@ -50,7 +50,7 @@ pgbench:
       GCP:
         machine_type:
           cpus: 16
-          memory: 104GiB
+          memory: 64GiB
         zone: us-central1-c
       AWS:
         machine_type: db.m4.4xlarge
@@ -69,21 +69,20 @@ pgbench:
   vm_groups:
     default:
       vm_spec:
-        GCP:
-          machine_type: n1-standard-16
-          image: ubuntu-1604-xenial-v20170815a
-          image_project: ubuntu-os-cloud
-          zone: us-central1-c
         AWS:
           machine_type: m4.4xlarge
           image: ami-09d2fb69
           zone: us-west-1a
         Azure:
-          machine_type: Standard_A2_v2
+          machine_type: Standard_A8m_v2
           image: Canonical:UbuntuServer:16.04-LTS:latest
           zone: westus
+        GCP:
+          machine_type: n1-standard-16
+          image: ubuntu-1604-xenial-v20170815a
+          image_project: ubuntu-os-cloud
+          zone: us-central1-c
 """
-
 
 TEST_DB_NAME = 'perftest'
 DEFAULT_DB_NAME = 'postgres'

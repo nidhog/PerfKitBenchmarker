@@ -294,9 +294,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     once, after the resource is confirmed to exist. It is intended to allow
     data about the resource to be collected or for the resource to be tagged.
     """
-    if self.spec.high_availability:
-      self._EnableHighAvailability()
-
     # TODO(ferneyhough): raise exception on failure
     cmd = util.GcloudCommand(
         self, 'sql', 'users', 'create', self.GetUsername(), 'dummy_host',
@@ -304,6 +301,9 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--password={0}'.format(self.GetPassword()))
     stdout, _, _ = cmd.Issue()
     print(stdout)
+
+    if self.spec.high_availability:
+      self._EnableHighAvailability()
 
   def _CreateDependencies(self):
     """Method that will be called once before _CreateResource() is called.

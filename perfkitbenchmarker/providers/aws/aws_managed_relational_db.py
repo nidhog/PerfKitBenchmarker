@@ -48,6 +48,17 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.zone = self.spec.vm_spec.zone
     self.region = util.GetRegionFromZone(self.zone)
 
+  def GetMetadata(self):
+    metadata = super(AzureManagedRelationalDb, self).GetMetadata()
+    metadata.update({
+      'managed_relational_db_primary_zone': self.primary_zone,
+    })
+    if self.spec.high_availability:
+      metadata.update({
+          'managed_relational_db_secondary_zone': self.secondary_zone,
+      })
+    return metadata
+
   @staticmethod
   def GetDefaultDatabaseVersion(database):
     """Returns the default version of a given database.
@@ -223,6 +234,12 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _ParsePort(self, describe_instance_json):
     return describe_instance_json['DBInstances'][0]['Endpoint']['Port']
 
+  def _SavePrimaryAndSecondaryZones(self, json_output):
+      self.primary_zone = json_output['DBInstances'][0]['AvailabilityZone']
+      if self.spec.high_availability:
+        self.secondary_zone = (
+            json_output['DBInstances'][0]['SecondaryAvailabilityZone'])
+
   def _IsReady(self):
     """Return true if the underlying resource is ready.
 
@@ -233,7 +250,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    timeout = 60 * 60 * 6 # 6 hours. (RDS HA takes a long time to prepare)
+    timeout = 60 * 60 * 3 # 3 hours. (RDS HA takes a long time to prepare)
     cmd = util.AWS_PREFIX + [
         'rds',
         'describe-db-instances',
@@ -254,6 +271,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         state = json_output['DBInstances'][0]['DBInstanceStatus']
         logging.info('Instance state: {0}'.format(state))
         if state == 'available':
+          self._SavePrimaryAndSecondaryZones(json_output)
           break
       except:
         logging.exception('Error attempting to read stdout. Creation failure.')

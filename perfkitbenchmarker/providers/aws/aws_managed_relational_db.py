@@ -193,6 +193,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     if self.spec.high_availability:
       cmd.append('--multi-az')
+    else:
+      cmd.append('--availability-zone=%s' % self.spec.vm_spec.zone)
 
     vm_util.IssueCommand(cmd)
 

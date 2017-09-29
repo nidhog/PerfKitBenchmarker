@@ -49,9 +49,9 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.region = util.GetRegionFromZone(self.zone)
 
   def GetMetadata(self):
-    metadata = super(AzureManagedRelationalDb, self).GetMetadata()
+    metadata = super(AwsManagedRelationalDb, self).GetMetadata()
     metadata.update({
-      'managed_relational_db_primary_zone': self.primary_zone,
+      'managed_relational_db_zone': self.primary_zone,
     })
     if self.spec.high_availability:
       metadata.update({

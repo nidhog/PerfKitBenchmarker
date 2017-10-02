@@ -54,7 +54,7 @@ pgbench:
         zone: us-central1-c
       AWS:
         machine_type: db.m4.4xlarge
-        zone: us-west-1a
+        zone: us-west-1c
       Azure:
         zone: westus
     disk_spec:
@@ -72,7 +72,7 @@ pgbench:
         AWS:
           machine_type: m4.4xlarge
           image: ami-09d2fb69
-          zone: us-west-1a
+          zone: us-west-1c
         Azure:
           machine_type: Standard_A8m_v2
           image: Canonical:UbuntuServer:16.04-LTS:latest
